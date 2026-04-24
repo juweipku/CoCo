@@ -14,12 +14,9 @@
   </p>
 </div>
 
-
-Official PyTorch implementation of:
-
-**Compactness and Consistency: A Conjoint Framework for Deep Graph Clustering** 
-Wei Ju, Siyu Yi, Kangjie Zheng, Yifan Wang, Ziyue Qiao, Li Shen, Yongdao Zhou, Xiaochun Cao, Jiancheng Lv 
-ICLR 2026 Oral
+This is the pytorch implementation for our ICLR 2026 Oral [paper](https://openreview.net/pdf?id=9jdQLmPUHW):
+> Wei Ju, Siyu Yi, Kangjie Zheng, Yifan Wang, Ziyue Qiao, Li Shen, Yongdao Zhou, Xiaochun Cao, Jiancheng Lv. 
+> Compactness and Consistency: A Conjoint Framework for Deep Graph Clustering
 
 ---
 
