@@ -15,8 +15,6 @@
 </div>
 
 
-# CoCo: Compactness and Consistency for Deep Graph Clustering
-
 Official PyTorch implementation of:
 
 **Compactness and Consistency: A Conjoint Framework for Deep Graph Clustering** 
