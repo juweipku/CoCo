@@ -45,8 +45,9 @@ if __name__ == '__main__':
         args.consistency_memory_size = X.shape[0] * 10
         consistency = Consist_net(args)
         # build our network
-        CoCo = compact_net(input_dim=X.shape[1], hidden_dim=args.dims, act=args.activate, 
-                        k=args.k, stage_num=args.stage_num, beta=args.beta, cluster_num=cluster_num)
+        CoCo = compact_net(input_dim=X.shape[1], hidden_dim=args.dims, act=args.activate,
+                        k=args.k, stage_num=args.stage_num, beta=args.beta, cluster_num=cluster_num,
+                        lamd=args.lamd)
 
         optimizer = optim.Adam(CoCo.parameters(), lr=args.lr)
 
@@ -60,7 +61,8 @@ if __name__ == '__main__':
 
             Z1, Z2 = CoCo(X_l, X_g, A)
             loss = 0.5 * (consistency(Z1, Z2) + consistency(Z2, Z1))
-            
+
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 

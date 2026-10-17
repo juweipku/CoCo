@@ -5,7 +5,6 @@ from opt import args
 from sklearn import metrics
 from munkres import Munkres
 from kmeans_gpu import kmeans
-import torch.nn.functional as F
 from sklearn.decomposition import PCA
 from sklearn.metrics import adjusted_rand_score as ari_score
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
@@ -208,89 +207,3 @@ def diffusion_adj(adj, mode="ppr", transport_rate=0.2):
         diff_adj = transport_rate * np.linalg.inv((np.eye(d.shape[0]) - (1 - transport_rate) * norm_adj))
 
     return diff_adj
-
-
-def cor_loss(Z1, Z2):
-    Sim = torch.mm(F.normalize(Z1, dim=1), F.normalize(Z2, dim=1).t())
-    n, m = Sim.shape
-    assert n == m
-    off_diagonal_Sim = Sim.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
-    Loss = torch.diagonal(Sim).add(-1).pow(2).mean() + off_diagonal_Sim.pow(2).mean()
-    return Loss
-
-
-def target_distribution(Q):
-    """
-    calculate the target distribution (student-t distribution)
-    Args:
-        Q: the soft assignment distribution
-    Returns: target distribution P
-    """
-    weight = Q ** 2 / Q.sum(0)
-    P = (weight.t() / weight.sum(1)).t()
-    return P
-
-
-# clustering guidance from DFCN
-def distribution_loss(Q, P):
-    """
-    calculate the clustering guidance loss L_{KL}
-    Args:
-        Q: the soft assignment distribution
-        P: the target distribution
-    Returns: L_{KL}
-    """
-    loss = F.kl_div((Q[0].log() + Q[1].log() + Q[2].log()) / 3, P, reduction='batchmean')
-    return loss
-
-
-def comprehensive_similarity(Z1, Z2, E1, E2, alpha):
-    Z1_Z2 = torch.cat([torch.cat([Z1 @ Z1.T, Z1 @ Z2.T], dim=1),
-                       torch.cat([Z2 @ Z1.T, Z2 @ Z2.T], dim=1)], dim=0)
-
-    E1_E2 = torch.cat([torch.cat([E1 @ E1.T, E1 @ E2.T], dim=1),
-                       torch.cat([E2 @ E1.T, E2 @ E2.T], dim=1)], dim=0)
-
-    S = alpha * Z1_Z2 + (1 - alpha) * E1_E2
-    return S
-
-
-def hard_sample_aware_infoNCE(S, M, pos_neg_weight, pos_weight, node_num):
-    pos_neg = M * torch.exp(S * pos_neg_weight)
-    pos = torch.cat([torch.diag(S, node_num), torch.diag(S, -node_num)], dim=0)
-    pos = torch.exp(pos * pos_weight)
-    neg = (torch.sum(pos_neg, dim=1) - pos)
-    infoNEC = (-torch.log(pos / (pos + neg))).sum() / (2 * node_num)
-    return infoNEC
-
-
-def infoNCE(Z, E, M, pos_neg_weight, pos_weight, node_num):
-    H = torch.cat([Z, E], dim=1)
-    S = H @ H.T
-    pos_neg = torch.exp(S)
-    pos = torch.cat([torch.diag(S, node_num), torch.diag(S, -node_num)], dim=0)
-    pos = torch.exp(pos)
-    neg = (torch.sum(pos_neg, dim=1) - pos)
-    infoNEC = (-torch.log(pos / (pos + neg))).sum() / (2 * node_num)
-    return infoNEC
-
-
-def square_euclid_distance(Z, center):
-    ZZ = (Z * Z).sum(-1).reshape(-1, 1).repeat(1, center.shape[0])
-    CC = (center * center).sum(-1).reshape(1, -1).repeat(Z.shape[0], 1)
-    ZZ_CC = ZZ + CC
-    ZC = Z @ center.T
-    distance = ZZ_CC - 2 * ZC
-    return distance
-
-
-def pseudo_matrix(P, Z, E, node_num):
-    H = torch.cat([Z, E], dim=1)
-    S = H @ H.T
-    P = torch.tensor(P)
-    P = torch.cat([P, P], dim=0)
-    Q = (P == P.unsqueeze(1)).float().to(args.device)
-    S_norm = (S - S.min()) / (S.max() - S.min())
-    M_mat = torch.abs(Q - S_norm) ** args.beta
-    M = torch.cat([torch.diag(M_mat, node_num), torch.diag(M_mat, -node_num)], dim=0)
-    return M, M_mat

@@ -17,10 +17,12 @@ class SampleSimilarities(nn.Module):
         self.register_buffer('memory', torch.rand(self.queueSize, feats_dim).mul_(2 * stdv).add_(-stdv))
         print('using queue shape: ({},{})'.format(self.queueSize, feats_dim))
 
-    def forward(self, q, update=True):
+    def forward(self, q, update=True, index=None):
         N, _ = q.shape
         S = 128
-        index = torch.LongTensor(random.sample(range(N), S)).to(self.args.device)
+        if index is None:
+            index = torch.LongTensor(random.sample(range(N), S))
+        index = index.to(self.args.device)
         B = torch.index_select(q, 0, index)
         # B = q
         batchSize = B.shape[0]
@@ -62,8 +64,10 @@ class Consist_net(nn.Module):
         # local_feats = self.l2norm(local_feats)
         # global_feats = self.l2norm(global_feats)
 
-        similarities_local = self.local_sample_similarities(local_feats)
-        similarities_global = self.global_sample_similarities(global_feats)
+        # share the sampled node indices so that the two views correspond node-by-node
+        index = torch.LongTensor(random.sample(range(local_feats.shape[0]), 128))
+        similarities_local = self.local_sample_similarities(local_feats, index=index)
+        similarities_global = self.global_sample_similarities(global_feats, index=index)
 
         loss = self.criterion(similarities_local, similarities_global)
         # mse_loss = F.mse_loss(similarities_local, similarities_global)

@@ -13,15 +13,14 @@ class Compact_learning(object):
         self.stage_num = stage_num
         self.beta = beta
         self.momentum = momentum
-        self.mu = torch.Tensor(1, self.k)
-        self.mu.normal_(0, math.sqrt(2. / self.k))
-        self.mu = self.mu / (1e-6 + self.mu.norm(dim=0, keepdim=True))
 
     def __call__(self, embds):
         b, n = embds.size()
-        mu = self.mu.repeat(b, 1).cuda(embds.device) # mu=lambda z=y 
-        # mu = mu / (mu.norm(dim=0, keepdim=True))
-        # _embds = embds
+        if not hasattr(self, "mu"):
+            # sample the random init once at the first call, reuse afterwards
+            self.mu = torch.empty(b, self.k, device=embds.device).normal_(0, math.sqrt(2. / self.k))
+            self.mu = F.normalize(self.mu, p=2, dim=0)
+        mu = self.mu
         embd_nor = embds / (embds.norm(dim=0, keepdim=True))
         _embds = embds / (embds.norm(dim=0, keepdim=True))
 
@@ -35,44 +34,16 @@ class Compact_learning(object):
                 mu = torch.mm(_embds, z)  # b * k
                 mu = mu / (1e-6 + mu.norm(dim=0, keepdim=True))
         z_t = z.permute(1, 0)  # k * n
-        _embds = torch.mm(mu, z_t)  # b * n 
-
-        # for i in range(self.stage_num):
-        #     _embds_t = _embds.permute(1, 0)  # n * b
-        #     z = torch.mm(_embds_t, mu)  # n * k
-        #     z = z / self.lamd
-        #     z = F.softmax(z, dim=1)
-        #     z = z / (1e-6 + z.sum(dim=0, keepdim=True))
-        #     mu = torch.mm(_embds, z)  # b * k
-        #     mu = mu / (1e-6 + mu.norm(dim=0, keepdim=True))
-        # z_t = z.permute(1, 0)  # k * n
-        # _embds = torch.mm(mu, z_t)  # b * n 
-
-        # for i in range(self.stage_num):
-        #     _embds_t = _embds.permute(1, 0)  # n * b
-        #     z = torch.mm(_embds_t, mu)  # n * k
-        #     z = z / self.lamd
-        #     z = F.softmax(z, dim=1)
-        #     z = z / (1e-6 + z.sum(dim=0, keepdim=True))
-        #     mu = torch.mm(_embds, z)  # b * k
-        #     mu = mu / (1e-6 + mu.norm(dim=0, keepdim=True))
-        # _embds = mu
-
-        # if if_train:
-        #     mu = mu.cpu()
-        #     self.mu = self.momentum * self.mu + (1 - self.momentum) * mu.mean(dim=0, keepdim=True)
-
-        # return self.beta * _embds + embds
+        _embds = torch.mm(mu, z_t)  # b * n
         return self.beta * _embds + embd_nor
-    
 
 
 class compact_net(nn.Module):
-    def __init__(self, input_dim, hidden_dim, act, k, stage_num, beta, cluster_num):
+    def __init__(self, input_dim, hidden_dim, act, k, stage_num, beta, cluster_num, lamd=1):
         super(compact_net, self).__init__()
         self.mlp1 = nn.Linear(input_dim, hidden_dim)
         self.mlp2 = nn.Linear(input_dim, hidden_dim)
-        self.compact = Compact_learning(k, stage_num, beta)
+        self.compact = Compact_learning(k, stage_num, beta, lamd)
 
         if act == "ident":
             self.activate = lambda x: x
@@ -84,7 +55,7 @@ class compact_net(nn.Module):
             self.activate = nn.LeakyReLU(0.2, inplace=True)
 
         self.reset()
-        
+
     def reset(self):
         self.mlp1.reset_parameters()
         self.mlp2.reset_parameters()

@@ -86,41 +86,6 @@ def kmeans(
     return choice_cluster.cpu(), initial_state
 
 
-def kmeans_predict(
-        X,
-        cluster_centers,
-        distance='euclidean',
-        device=torch.device('cuda')
-):
-    """
-    predict using cluster centers
-    :param X: (torch.tensor) matrix
-    :param cluster_centers: (torch.tensor) cluster centers
-    :param distance: (str) distance [options: 'euclidean', 'cosine'] [default: 'euclidean']
-    :param device: (torch.device) device [default: 'cpu']
-    :return: (torch.tensor) cluster ids
-    """
-    # print(f'predicting on {device}..')
-
-    if distance == 'euclidean':
-        pairwise_distance_function = pairwise_distance
-    elif distance == 'cosine':
-        pairwise_distance_function = pairwise_cosine
-    else:
-        raise NotImplementedError
-
-    # convert to float
-    X = X.float()
-
-    # transfer to device
-    X = X.to(device)
-
-    dis = pairwise_distance_function(X, cluster_centers)
-    choice_cluster = torch.argmin(dis, dim=1)
-
-    return choice_cluster.cpu()
-
-
 def pairwise_distance(data1, data2, device=torch.device('cuda')):
     # transfer to device
 
